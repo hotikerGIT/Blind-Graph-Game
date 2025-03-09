@@ -27,6 +27,13 @@ DIRECTION_OPPOSITES = {
     'down-right': 'up-left'
 }
 
+# Список кортежей для получения индексов квадрата 3х3
+MATRIX_ADJACENCY_DIRECTIONS = [
+    (-1, -1), (-1, 0), (-1, 1),
+    (0, -1), (0, 0), (0, 1),
+    (1, -1), (1, 0), (1, 1)
+]
+
 
 # Функция для получения обратного направления
 def get_reverse_direction(direction: str) -> str:

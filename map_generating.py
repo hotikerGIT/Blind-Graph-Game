@@ -1,3 +1,6 @@
+# TODO: исправить функцию create_connections
+
+
 import random
 from values import *
 
@@ -29,55 +32,109 @@ class GraphMap:
         ]
         self.matrix[spots_amount][spots_amount] = 1
 
-        for spot_name in range(2, spots_amount + 1):
-            new_spot = Spot(spot_name)
-            self.add_spot(new_spot)
+        self.fill_matrix()
+        self.connect_graph()
 
-    def add_spot(self, spot: 'Spot') -> None:
-        toggle = False
+    def add_spot_to_matrix(self, new_spot: 'Spot') -> None:
+        """
+        Функция добавления вершины в случайное место в матрице, причем
+        вершина должна находиться вблизи с остальными
+        :param new_spot: новая вершина
+        :return:
+        """
 
-        while not toggle:
-            connection, cords = random.choice(list(self.graph.values()))
+        # Итерируемся, пока не найдем место для вершины
+        # причем размеры матрицы рассчитаны так, что место всегда найдется
+        while True:
+            # Создаем список занятых координат
+            taken_cords = [(x, y) for _, (x, y) in self.graph.values()]
 
-            free_directions = connection.get_free_directions()
-            if not free_directions:
-                continue
+            # Выбираем случайные координаты
+            x, y = random.choice(taken_cords)
 
-            picked_direction: str = random.choice(free_directions)
+            # Создаем список для направлений и случайно перемешиваем его
+            directions = MATRIX_ADJACENCY_DIRECTIONS[:]
+            random.shuffle(directions)
 
-            pick: tuple[int, int] = DIRECTION_ASSIGNMENT[picked_direction]
-            attach: tuple[int, int] = DIRECTION_ASSIGNMENT[DIRECTION_OPPOSITES[picked_direction]]
-            new_x, new_y = cords[0] + pick[0] - 1, cords[1] + pick[1] - 1
+            toggle = False
+            for delta_x, delta_y in directions:
+                new_x = x + delta_x
+                new_y = y + delta_y
 
-            if self.matrix[new_x][new_y]:
-                continue
+                # Если новые координаты указывают на уже существующую вершину, пропускаем итерацию
+                if (new_x, new_y) in taken_cords:
+                    continue
 
-            spot.directions[attach[0]][attach[1]] = connection.spot_name
-            connection.directions[pick[0]][pick[1]] = spot.spot_name
+                # Занимаем свободное место и добавляем его в граф
+                self.matrix[new_x][new_y] = new_spot.spot_name
+                self.graph[new_spot.spot_name] = (new_spot, (new_x, new_y))
 
-            self.matrix[new_x][new_y] = spot.spot_name
-            self.graph[spot.spot_name] = (spot, (new_x, new_y))
+                toggle = True
+                break
 
-            # Просматриваем точки, находящиеся в 1 шаге от нашей
-            close_points: list[tuple['Spot', tuple[int, int]]] = []
-            for x, y in DIRECTION_ASSIGNMENT.values():
-                spot_cords = new_x - x - 1, new_y - y - 1
-                content = self.matrix[spot_cords[0]][spot_cords[1]]
+            if toggle:
+                break
 
-                if content:
-                    close_points.append((self.graph[content][0], (x, y)))
+    def fill_matrix(self) -> None:
+        for spot_name in range(2, self.spots_amount + 1):
+            self.add_spot_to_matrix(Spot(spot_name))
 
-            # Выбираем несколько точек, которые находятся вблизи с данной, и связываем их ребрами
-            for _ in range(random.randint(0, random.choice(EDGE_COUNT_CHANCES))):
-                if close_points:
-                    random_pick = random.choice(close_points)
-                    new_spot, (x, y) = random_pick
-                    close_points.remove(random_pick)
+    def get_scope(self, spot_name: int) -> list[int]:
+        """
+        Функция, возвращающая все вершины в квадрате 3х3, центром которого
+        является вершина по заданному имени
+        :param spot_name: имя нужной вершины
+        :return:
+        """
+        res = []
 
-                    spot.directions[x][y] = new_spot.spot_name
-                    new_spot.directions[2 - x][2 - x] = spot.spot_name
+        _, (cur_x, cur_y) = self.graph[spot_name]
 
-            toggle = True
+        for x, y in MATRIX_ADJACENCY_DIRECTIONS:
+            res.append(self.matrix[cur_x + x][cur_y + y])
+
+        return res
+
+    def create_connections(self, spot: 'Spot') -> None:
+        spot_name = spot.spot_name
+
+        scope: list[int] = self.get_scope(spot_name)
+        possible_connections = {name: DIRECTIONS[index]
+                                for index, name in enumerate(scope)
+                                if name and name != spot_name}
+
+        already_connected = sum(1 for row in spot.directions for i in row if i != spot_name and i)
+        to_connect = random.choice(EDGE_COUNT_CHANCES)
+
+        if already_connected < to_connect:
+            potential_connections: list[int] = list(possible_connections.keys())
+            needed_connections = to_connect - already_connected
+
+            done_connections = 0
+            loop_warning = 0
+            while done_connections != needed_connections:
+                loop_warning += 1
+
+                if loop_warning == 1_000:
+                    raise ValueError('Невозможно создать нужное количество ребер')
+
+                new_point_name: int = random.choice(potential_connections)
+                new_point: 'Spot' = self.graph[new_point_name][0]
+                current_direction = possible_connections[new_point_name]
+                direction_to_check = DIRECTION_OPPOSITES[current_direction]
+
+                if not new_point.check_connection(direction_to_check):
+                    other_x, other_y = DIRECTION_ASSIGNMENT[direction_to_check]
+                    cur_x, cur_y = DIRECTION_ASSIGNMENT[current_direction]
+
+                    new_point.directions[other_x][other_y] = spot_name
+                    spot.directions[cur_x][cur_y] = new_point_name
+
+                    done_connections += 1
+
+    def connect_graph(self):
+        for spot, _ in self.graph.values():
+            self.create_connections(spot)
 
     def disallow_intersections(self, spot: 'Spot') -> None:
         """
@@ -197,7 +254,7 @@ class Spot:
 
 
 if __name__ == '__main__':
-    Graph = GraphMap(3)
+    Graph = GraphMap(10)
 
     for row in Graph.matrix:
         print(*row)
