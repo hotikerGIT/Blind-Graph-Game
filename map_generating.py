@@ -1,6 +1,5 @@
 # TODO: исправить функцию create_connections
 
-
 import random
 from values import *
 
@@ -76,16 +75,18 @@ class GraphMap:
                 break
 
     def fill_matrix(self) -> None:
+        """Заполнение матрицы путем итеративного добавления точек"""
         for spot_name in range(2, self.spots_amount + 1):
             self.add_spot_to_matrix(Spot(spot_name))
 
     def get_scope(self, spot_name: int) -> list[int]:
         """
         Функция, возвращающая все вершины в квадрате 3х3, центром которого
-        является вершина по заданному имени
+        является вершина по заданному имени, в виде одномерного списка
         :param spot_name: имя нужной вершины
         :return:
         """
+
         res = []
 
         _, (cur_x, cur_y) = self.graph[spot_name]
@@ -96,45 +97,92 @@ class GraphMap:
         return res
 
     def create_connections(self, spot: 'Spot') -> None:
+        """
+        Создание ребер графа путем выбора точки и соединяя ее с уже созданными.
+        Меняет не граф, а значения directions для точек
+        :param spot: точка, которую нужно соединить
+        :return:
+        """
+
         spot_name = spot.spot_name
 
+        # Получаем квадрат 3х3, содержащий возможные соединения для точки
         scope: list[int] = self.get_scope(spot_name)
-        possible_connections = {name: DIRECTIONS[index]
-                                for index, name in enumerate(scope)
-                                if name and name != spot_name}
 
+        # Словарь возможных соединений типа имя точки: направление
+        possible_connections: dict[int, str] = {name: DIRECTIONS[index]
+                                for index, name in enumerate(scope)
+                                if name and name != spot_name and name != -1}
+
+        # Переменная, хранящая количество существующих соединений для заданной точки
         already_connected = sum(1 for row in spot.directions for i in row if i != spot_name and i)
-        to_connect = random.choice(EDGE_COUNT_CHANCES)
+
+        # Регуляция количества ребер
+        pick = [i for i in EDGE_COUNT_CHANCES if i <= len(possible_connections)]
+
+        # В случае, если невозможно создать новых ребер, выходим из функции
+        if not pick:
+            return
+
+        to_connect = random.choice(pick)
 
         if already_connected < to_connect:
+            # Список имен точек
             potential_connections: list[int] = list(possible_connections.keys())
             needed_connections = to_connect - already_connected
 
-            done_connections = 0
+            done_connections = 0  # Счетчик созданных ребер
             loop_warning = 0
             while done_connections != needed_connections:
                 loop_warning += 1
 
-                if loop_warning == 1_000:
-                    raise ValueError('Невозможно создать нужное количество ребер')
+                if loop_warning == LOOP_LIMIT:
+                    break
 
+                # Выбор точки, которую будем пытаться соединить
                 new_point_name: int = random.choice(potential_connections)
                 new_point: 'Spot' = self.graph[new_point_name][0]
-                current_direction = possible_connections[new_point_name]
-                direction_to_check = DIRECTION_OPPOSITES[current_direction]
 
+                # Получаем взаимообратные направления
+                current_direction: str = possible_connections[new_point_name]
+                direction_to_check: str = DIRECTION_OPPOSITES[current_direction]
+
+                # Проверяем отсутствие соединения у выбранной точки по данному направлению
                 if not new_point.check_connection(direction_to_check):
                     other_x, other_y = DIRECTION_ASSIGNMENT[direction_to_check]
                     cur_x, cur_y = DIRECTION_ASSIGNMENT[current_direction]
 
+                    # Обновляем хранилища направлений выбранных точек
                     new_point.directions[other_x][other_y] = spot_name
                     spot.directions[cur_x][cur_y] = new_point_name
+
+                    # Убираем возможность пересечений ребер для каждой точки
+                    self.disallow_intersections(new_point)
+                    self.disallow_intersections(spot)
 
                     done_connections += 1
 
     def connect_graph(self):
+        """Создание ребер графа путем добавления в него новых точек и соединения """
         for spot, _ in self.graph.values():
             self.create_connections(spot)
+
+        self.clear_empty_spots()
+
+    def clear_empty_spots(self) -> None:
+        """Функция, убирающая из карты точки, не связанные с графом"""
+        for spot_name, (spot, cords) in self.graph.items():
+            flag = True
+
+            for connection in spot.directions:
+                if connection != -1 and connection != spot_name and connection:
+                    flag = False
+                    break
+
+            if flag:
+                self.graph.pop(spot_name)
+                self.matrix[cords[0]][cords[1]] = 0
+                print('Найдена отстраненная точка')
 
     def disallow_intersections(self, spot: 'Spot') -> None:
         """
@@ -150,34 +198,22 @@ class GraphMap:
         :return:
         """
 
-        used_directions = {}
+        scope = self.get_scope(spot.spot_name)
+        directions_shortcut = spot.directions
 
-        for row_index, row in enumerate(spot.directions):
-            for col_index, col in enumerate(row):
-                if spot.directions[row_index][col_index] != 0:
-                    string_direction = DIRECTIONS[row_index * 3 + col_index]
-                    spot_name = spot.directions[row_index][col_index]
+        if scope[1]:
+            if scope[3]:
+                directions_shortcut[0][0] = -1
 
-                    used_directions[string_direction] = spot_name
+            if scope[5]:
+                directions_shortcut[0][2] = -1
 
-        if 'up' in used_directions.keys():
-            for direction, spot_name in used_directions.items():
-                check_point: 'Spot' = self.graph[spot_name][0]
-                if direction == 'left' and check_point.check_connection('up-right'):
-                    spot.directions[0][2] = -1
+        if scope[7]:
+            if scope[3]:
+                directions_shortcut[2][0] = -1
 
-                if direction == 'right' and check_point.check_connection('up-left'):
-                    spot.directions[0][0] = -1
-
-        if 'down' in used_directions.keys():
-            for direction, spot_name in used_directions.items():
-                check_point: 'Spot' = self.graph[spot_name][0]
-                if direction == 'left' and check_point.check_connection('down-right'):
-                    spot.directions[2][2] = -1
-
-                if direction == 'right' and check_point.check_connection('down-left'):
-                    spot.directions[2][0] = -1
-
+            if scope[5]:
+                directions_shortcut[2][2] = -1
 
 
 class Spot:
@@ -253,11 +289,11 @@ class Spot:
         return res
 
 
+def testing():
+    random_size = random.randint(1, 100)
+    graph = GraphMap(random_size)
+
+
 if __name__ == '__main__':
-    Graph = GraphMap(10)
-
-    for row in Graph.matrix:
-        print(*row)
-
-    for key, item in Graph.graph.items():
-        print(key, item[0].directions, item[1])
+    for i in range(10000):
+        testing()

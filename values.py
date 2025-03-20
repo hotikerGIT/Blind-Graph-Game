@@ -1,6 +1,6 @@
 # Список строковых команд для направлений
 DIRECTIONS = ['up-left', 'up', 'up-right',
-              'right', 'mid', 'left',
+              'left', 'mid', 'right',
               'down-left', 'down', 'down-right']
 
 # Словарь предписания направлений, структуры "направление - индексы"
@@ -42,10 +42,12 @@ def get_reverse_direction(direction: str) -> str:
 
 # Список частот количества ребер, которые необходимо добавить к вершине
 # после ее соединения с графом
-EDGE_COUNT_CHANCES = [1,
+EDGE_COUNT_CHANCES = [1, 1, 1,
                       2,
-                      3, 3, 3,
-                      4, 4, 4,
+                      3, 3,
+                      4,
                       5, 5,
                       6,
                       7]
+
+LOOP_LIMIT = 50
