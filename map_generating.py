@@ -1,5 +1,3 @@
-# TODO: исправить функцию create_connections
-
 import random
 from values import *
 
@@ -167,23 +165,6 @@ class GraphMap:
         for spot, _ in self.graph.values():
             self.create_connections(spot)
 
-        self.clear_empty_spots()
-
-    def clear_empty_spots(self) -> None:
-        """Функция, убирающая из карты точки, не связанные с графом"""
-        for spot_name, (spot, cords) in self.graph.items():
-            flag = True
-
-            for connection in spot.directions:
-                if connection != -1 and connection != spot_name and connection:
-                    flag = False
-                    break
-
-            if flag:
-                self.graph.pop(spot_name)
-                self.matrix[cords[0]][cords[1]] = 0
-                print('Найдена отстраненная точка')
-
     def disallow_intersections(self, spot: 'Spot') -> None:
         """
         Функция, которая убирает возможность создания пересечений ребер
@@ -202,17 +183,21 @@ class GraphMap:
         directions_shortcut = spot.directions
 
         if scope[1]:
-            if scope[3]:
+            check = self.graph[spot.spot_name][0]
+
+            if check.check_connection('down-left'):
                 directions_shortcut[0][0] = -1
 
-            if scope[5]:
+            if check.check_connection('down-right'):
                 directions_shortcut[0][2] = -1
 
         if scope[7]:
-            if scope[3]:
+            check = self.graph[spot.spot_name][0]
+
+            if check.check_connection('up-left'):
                 directions_shortcut[2][0] = -1
 
-            if scope[5]:
+            if check.check_connection('up-right'):
                 directions_shortcut[2][2] = -1
 
 
