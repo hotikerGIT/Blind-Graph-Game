@@ -29,7 +29,7 @@ class Player:
 
         for row in self.position.directions:
             for directions in row:
-                res.append(directions != -1 and directions)
+                res.append(not isinstance(directions, NullSpot) and directions is not None)
 
         return res
 
