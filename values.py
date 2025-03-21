@@ -51,3 +51,12 @@ EDGE_COUNT_CHANCES = [1, 1, 1,
                       7]
 
 LOOP_LIMIT = 50
+
+# Словарь сложности игры (5)
+DIFFICULTY_ASSIGNMENT = {
+    1: {
+        'size-low': 8,
+        'size-high': 12,
+        'score-needed': 15,
+    }
+}
