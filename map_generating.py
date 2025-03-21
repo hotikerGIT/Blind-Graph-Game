@@ -113,7 +113,9 @@ class GraphMap:
                                 if name and name != spot_name and name != -1}
 
         # Переменная, хранящая количество существующих соединений для заданной точки
-        already_connected = sum(1 for row in spot.directions for i in row if i != spot_name and i)
+        already_connected = sum(1 for row in spot.directions
+                                for i in row
+                                if i != spot and i is not None and not isinstance(i, NullSpot))
 
         # Регуляция количества ребер
         pick = [i for i in EDGE_COUNT_CHANCES if i <= len(possible_connections)]
@@ -151,8 +153,8 @@ class GraphMap:
                     cur_x, cur_y = DIRECTION_ASSIGNMENT[current_direction]
 
                     # Обновляем хранилища направлений выбранных точек
-                    new_point.directions[other_x][other_y] = spot_name
-                    spot.directions[cur_x][cur_y] = new_point_name
+                    new_point.directions[other_x][other_y] = spot
+                    spot.directions[cur_x][cur_y] = new_point
 
                     # Убираем возможность пересечений ребер для каждой точки
                     self.disallow_intersections(new_point)
@@ -186,19 +188,19 @@ class GraphMap:
             check = self.graph[spot.spot_name][0]
 
             if check.check_connection('down-left'):
-                directions_shortcut[0][0] = -1
+                directions_shortcut[0][0] = NullSpot()
 
             if check.check_connection('down-right'):
-                directions_shortcut[0][2] = -1
+                directions_shortcut[0][2] = NullSpot()
 
         if scope[7]:
             check = self.graph[spot.spot_name][0]
 
             if check.check_connection('up-left'):
-                directions_shortcut[2][0] = -1
+                directions_shortcut[2][0] = NullSpot()
 
             if check.check_connection('up-right'):
-                directions_shortcut[2][2] = -1
+                directions_shortcut[2][2] = NullSpot()
 
 
 class Spot:
@@ -217,34 +219,11 @@ class Spot:
         """
 
         self.spot_name = spot_name
-        self.directions = ([0, 0, 0],
-                           [0, spot_name, 0],
-                           [0, 0, 0])
+        self.directions = ([None, None, None],
+                           [None, self, None],
+                           [None, None, None])
 
-    def add_edge(self, other: 'Spot', direction: str) -> bool:
-        """
-        Функция добавления ребра для графа.
-        Принимает две вершины, после чего проверяет, свободно ли направление
-        для обеих точек, затем добавляет связь между ними
-        :param other: Другая вершина графа
-        :param direction: строковая команда направления
-        :return: удалось ли добавить ребро
-        """
-
-        # Получаем индексы для каждого направления
-        x1, y1 = DIRECTION_ASSIGNMENT[direction]
-        x2, y2 = DIRECTION_ASSIGNMENT[get_reverse_direction(direction)]
-
-        # Если для вершины можно провести ребро, то мы его проводим
-        if (
-            self.directions[x1][y1] == 0 and
-            other.directions[x2][y2] == 0
-        ):
-            self.directions[x1][y1] = other.spot_name
-            other.directions[x2][y2] = self.spot_name
-            return True
-
-        return False
+        self.is_special = False
 
     def check_connection(self, direction: str) -> bool:
         """
@@ -257,21 +236,13 @@ class Spot:
         x, y = DIRECTION_ASSIGNMENT[direction]
         return bool(self.directions[x][y])
 
-    def get_free_directions(self) -> list[str]:
-        """
-        Функция, возвращающая список строковых команд
-        для направлений, которые еще не заняты вершинами
-        :return:
-        """
 
-        res = []
-
-        for row_index, row in enumerate(self.directions):
-            for col_index, col in enumerate(row):
-                if col == 0:
-                    res.append(DIRECTIONS[row_index * 3 + col_index])
-
-        return res
+class NullSpot(Spot):
+    """
+    Класс, показывающий невозможность создания ребра по заданному направлению
+    """
+    def __init__(self):
+        super().__init__(-1)
 
 
 def testing():
@@ -280,5 +251,7 @@ def testing():
 
 
 if __name__ == '__main__':
-    for i in range(10000):
-        testing()
+    graph = GraphMap(10)
+
+    for test_row in graph.matrix:
+        print(*test_row)
